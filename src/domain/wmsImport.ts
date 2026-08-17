@@ -274,17 +274,30 @@ export function buildScenarioFromWarehouseSchema(warehouseRaw: unknown, recShare
   const { counts, totalCells, matchedCells } = aggregateWarehouseCells(warehouseRaw);
 
   // В файле склада нет данных о трафике машин (это статический снимок структуры, не поток) —
-  // источники и обратный поток всегда присутствуют с параметрами по умолчанию. Ворота/сортировка/
-  // хранение тоже нужны почти всегда, иначе прямому потоку буквально некуда идти.
+  // источники и обратный поток всегда присутствуют с параметрами по умолчанию. Весь «хребет»
+  // топологии (ворота..сортировка..хранение/паллетирование..упаковка/контейнеры..отгрузка) тоже
+  // всегда присутствует, даже если под какой-то узел не нашлось тегов — иначе часть потока по
+  // шаблону рёбер (buildEdgesFromTemplate) молча упирается в тупик (нет исходящего ребра — сущность
+  // считается вышедшей из сценария, но не попадает ни в один канал отгрузки в статистике). Реальные
+  // данные из ячеек всё равно проявляются через resourceCount ниже — станция без своих ячеек просто
+  // остаётся с параметрами по умолчанию, а не пропадает.
   const present = new Set<StationType>(Object.keys(counts) as StationType[]);
-  present.add('sourceForward');
-  present.add('sourceReturn');
-  present.add('returnsGate');
-  present.add('returnsInspect');
-  present.add('utilization');
-  present.add('gate');
-  present.add('sort');
-  present.add('storage');
+  const BACKBONE: StationType[] = [
+    'sourceForward',
+    'sourceReturn',
+    'gate',
+    'sort',
+    'storage',
+    'pack',
+    'mobileContainer',
+    'shipCourier',
+    'palletize',
+    'shipTruck',
+    'returnsGate',
+    'returnsInspect',
+    'utilization',
+  ];
+  for (const t of BACKBONE) present.add(t);
 
   const stations: Station[] = [];
   const typeToId: Partial<Record<StationType, string>> = {};

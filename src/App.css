@@ -482,6 +482,45 @@
   }
 }
 
+/* ---- modal ---- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.modal-panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 20px;
+  width: 480px;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+.modal-panel input[type='file'] {
+  width: 100%;
+  font-size: 12px;
+}
+.wms-summary {
+  background: var(--canvas-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.6;
+  max-height: 280px;
+  overflow-y: auto;
+  margin-bottom: 14px;
+}
+.wms-summary p {
+  margin: 2px 0;
+}
+
 /* ---- help tooltip / labeled inputs / dist help text ---- */
 .help-tip {
   display: inline-flex;

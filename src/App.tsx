@@ -10,6 +10,7 @@ import { SimPage } from './simview/SimPage';
 import { StatsPanel } from './dashboard/StatsPanel';
 import type { Scenario } from './domain/types';
 import { downloadFile } from './lib/download';
+import { WmsImportDialog } from './editor/WmsImportDialog';
 
 type Tab = 'editor' | 'sim' | 'stats';
 
@@ -20,6 +21,7 @@ function App() {
   const resetToDefault = useScenarioStore((s) => s.resetToDefault);
   const clearSim = useSimStore((s) => s.clear);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [wmsDialogOpen, setWmsDialogOpen] = useState(false);
 
   const onImport = (file: File) => {
     file.text().then((text) => {
@@ -50,6 +52,9 @@ function App() {
           </button>
         </nav>
         <div className="header-actions">
+          <button className="btn-secondary" onClick={() => setWmsDialogOpen(true)}>
+            Импорт из выгрузки WMS
+          </button>
           <button
             className="btn-secondary"
             onClick={() =>
@@ -91,6 +96,8 @@ function App() {
         {tab === 'sim' && <SimPage />}
         {tab === 'stats' && <StatsPanel />}
       </main>
+
+      {wmsDialogOpen && <WmsImportDialog onClose={() => setWmsDialogOpen(false)} />}
     </div>
   );
 }
