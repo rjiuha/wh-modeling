@@ -1,0 +1,51 @@
+:root {
+  --bg: #0f1420;
+  --panel-bg: #161d2e;
+  --panel-border: #263049;
+  --canvas-bg: #0b101c;
+  --text: #e5e9f2;
+  --text-muted: #8b95ab;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --danger: #ef4444;
+  --edge-color: #55617c;
+  --edge-selected: #f59e0b;
+  --chart-grid: #263049;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input,
+select {
+  font-family: inherit;
+  background: var(--canvas-bg);
+  color: var(--text);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+table {
+  border-collapse: collapse;
+}
