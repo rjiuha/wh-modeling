@@ -521,6 +521,50 @@
   margin: 2px 0;
 }
 
+.proto-modal {
+  width: 620px;
+}
+.proto-layout {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 16px;
+  margin-top: 10px;
+}
+.proto-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.proto-new-btn {
+  margin-bottom: 6px;
+}
+.proto-list-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--panel-border);
+  cursor: pointer;
+  font-size: 12px;
+}
+.proto-list-item:hover {
+  border-color: var(--accent);
+}
+.proto-list-item.active {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: var(--accent);
+}
+.proto-list-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.proto-form {
+  min-width: 0;
+}
+
 /* ---- help tooltip / labeled inputs / dist help text ---- */
 .help-tip {
   display: inline-flex;

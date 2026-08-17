@@ -37,13 +37,23 @@ button {
 }
 
 input,
-select {
+select,
+textarea {
   font-family: inherit;
   background: var(--canvas-bg);
   color: var(--text);
   border: 1px solid var(--panel-border);
   border-radius: 6px;
   padding: 4px 8px;
+}
+textarea {
+  resize: vertical;
+  width: 100%;
+}
+input[type='color'] {
+  padding: 2px;
+  width: 48px;
+  height: 30px;
 }
 
 table {

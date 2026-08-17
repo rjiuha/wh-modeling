@@ -64,11 +64,32 @@ function StationProps({ station, onStartEdgeDraft }: { station: Station; onStart
   return (
     <div className="prop-panel">
       <div className="panel-title">{STATION_LABELS[station.type]}</div>
-      <p className="hint-text">{STATION_HINTS[station.type]}</p>
+      <p className="hint-text">{station.description || STATION_HINTS[station.type]}</p>
       <div className="field-group">
         <label className="field-label">Название</label>
         <input value={station.name} onChange={(e) => updateStation(station.id, { name: e.target.value })} />
       </div>
+
+      {station.type === 'custom' && (
+        <>
+          <div className="field-group">
+            <label className="field-label">Описание (своя подсказка вместо стандартной)</label>
+            <textarea
+              rows={2}
+              value={station.description ?? ''}
+              onChange={(e) => updateStation(station.id, { description: e.target.value })}
+            />
+          </div>
+          <div className="field-group inline">
+            <label className="field-label">Цвет</label>
+            <input
+              type="color"
+              value={station.color ?? '#9ca3af'}
+              onChange={(e) => updateStation(station.id, { color: e.target.value })}
+            />
+          </div>
+        </>
+      )}
 
       {!isSource && !isStorage && (
         <div className="field-group inline">

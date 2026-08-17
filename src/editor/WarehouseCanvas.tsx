@@ -61,6 +61,17 @@ function clipToRect(cx: number, cy: number, w: number, h: number, tx: number, ty
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
+// SVG <text> не переносится и не обрезается по границе сам — длинные названия станций (особенно
+// сгенерированные импортом из WMS, вида «Формирование мобильных контейнеров (736 яч.)») иначе
+// вылезают за рамку. Грубая оценка по среднему числу символов на пиксель ширины шрифта — не
+// идеально точно (моноширинным не является), но заведомо безопасно с запасом; clipPath на самой
+// станции — дополнительная страховка на случай, если оценка всё же промахнётся.
+function truncateForWidth(text: string, maxWidth: number, avgCharWidth: number): string {
+  const maxChars = Math.max(1, Math.floor(maxWidth / avgCharWidth));
+  if (text.length <= maxChars) return text;
+  return text.slice(0, Math.max(1, maxChars - 1)) + '…';
+}
+
 function stationAt(stations: Station[], x: number, y: number, excludeId?: string): Station | undefined {
   return stations.find((s) => s.id !== excludeId && x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h);
 }
@@ -326,6 +337,10 @@ export function WarehouseCanvas({
               const isEdgeDraftSource = edgeDraftFrom === s.id || edgeDrag?.fromId === s.id;
               const isEdgeDropTarget = edgeDrag?.targetId === s.id;
               const counts = liveCounts?.[s.id];
+              const color = s.color ?? STATION_COLORS[s.type];
+              const textWidth = s.w - 22;
+              const title = truncateForWidth(s.name, textWidth, 7.5);
+              const subtitle = truncateForWidth(STATION_LABELS[s.type], textWidth, 6);
               return (
                 <g
                   key={s.id}
@@ -344,35 +359,34 @@ export function WarehouseCanvas({
                   }}
                   style={{ cursor: onMoveStation ? 'grab' : 'pointer' }}
                 >
+                  <defs>
+                    <clipPath id={`clip-${s.id}`}>
+                      <rect width={s.w} height={s.h} rx={10} />
+                    </clipPath>
+                  </defs>
                   <rect
                     width={s.w}
                     height={s.h}
                     rx={10}
-                    fill={STATION_COLORS[s.type]}
+                    fill={color}
                     fillOpacity={isEdgeDropTarget ? 0.35 : 0.18}
-                    stroke={
-                      isEdgeDropTarget
-                        ? '#22d3ee'
-                        : isSelected
-                          ? 'var(--edge-selected)'
-                          : isEdgeDraftSource
-                            ? '#22d3ee'
-                            : STATION_COLORS[s.type]
-                    }
+                    stroke={isEdgeDropTarget ? '#22d3ee' : isSelected ? 'var(--edge-selected)' : isEdgeDraftSource ? '#22d3ee' : color}
                     strokeWidth={isSelected || isEdgeDraftSource || isEdgeDropTarget ? 3 : 1.6}
                   />
-                  <rect x={0} y={0} width={6} height={s.h} rx={3} fill={STATION_COLORS[s.type]} />
-                  <text x={14} y={22} className="station-title">
-                    {s.name}
-                  </text>
-                  <text x={14} y={38} className="station-subtitle">
-                    {STATION_LABELS[s.type]}
-                  </text>
-                  {counts && (
-                    <text x={14} y={s.h - 12} className="station-counts">
-                      очередь {counts.queue} · занято {counts.busy}/{s.common.resourceCount}
+                  <rect x={0} y={0} width={6} height={s.h} rx={3} fill={color} />
+                  <g clipPath={`url(#clip-${s.id})`}>
+                    <text x={14} y={22} className="station-title">
+                      {title}
                     </text>
-                  )}
+                    <text x={14} y={38} className="station-subtitle">
+                      {subtitle}
+                    </text>
+                    {counts && (
+                      <text x={14} y={s.h - 12} className="station-counts">
+                        {truncateForWidth(`очередь ${counts.queue} · занято ${counts.busy}/${s.common.resourceCount}`, textWidth, 6)}
+                      </text>
+                    )}
+                  </g>
                   {onCreateEdge && (
                     <circle
                       className="edge-handle"

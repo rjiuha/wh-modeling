@@ -45,7 +45,12 @@ interface ScenarioState {
   replaceScenario: (s: Scenario) => void;
   resetToDefault: () => void;
   updateScenarioMeta: (patch: Partial<Pick<Scenario, 'name' | 'seed' | 'durationHours'>>) => void;
-  addStation: (type: StationType, x: number, y: number) => string;
+  addStation: (
+    type: StationType,
+    x: number,
+    y: number,
+    overrides?: Partial<Pick<Station, 'name' | 'color' | 'description' | 'common'>>,
+  ) => string;
   updateStation: (id: string, patch: Partial<Station>) => void;
   moveStation: (id: string, x: number, y: number) => void;
   removeStation: (id: string) => void;
@@ -63,17 +68,20 @@ export const useScenarioStore = create<ScenarioState>()(
       replaceScenario: (s) => set({ scenario: s, selectedId: null }),
       resetToDefault: () => set({ scenario: buildDefaultScenario(), selectedId: null }),
       updateScenarioMeta: (patch) => set((st) => ({ scenario: { ...st.scenario, ...patch } })),
-      addStation: (type, x, y) => {
+      addStation: (type, x, y, overrides) => {
         const id = `st_${nanoid(6)}`;
         const station: Station = {
           id,
           type,
-          name: id,
+          name: overrides?.name ?? id,
           x,
           y,
           w: 160,
           h: 84,
           ...defaultStationParams(type),
+          ...(overrides?.common ? { common: overrides.common } : {}),
+          ...(overrides?.color ? { color: overrides.color } : {}),
+          ...(overrides?.description ? { description: overrides.description } : {}),
         };
         set((st) => ({ scenario: { ...st.scenario, stations: [...st.scenario.stations, station] }, selectedId: id }));
         return id;

@@ -125,6 +125,25 @@ export interface Station {
   source?: SourceParams;
   sort?: SortParams;
   returnsInspect?: ReturnsInspectParams;
+  // Переопределяют STATION_COLORS[type]/STATION_HINTS[type] на плане и в панели параметров —
+  // заполняются при создании станции из своего прототипа (см. store/prototypeStore.ts), но
+  // остаются обычными редактируемыми полями конкретного экземпляра станции, без связи с
+  // прототипом после создания (снапшот, не «класс со ссылкой на родителя»).
+  color?: string;
+  description?: string;
+}
+
+// Пользовательский шаблон «своей» станции — имя/описание/цвет/параметры по умолчанию,
+// сохраняется в отдельной постоянной библиотеке (store/prototypeStore.ts), не привязан к
+// конкретному сценарию. Всегда создаёт станцию с type:'custom' (простой passthrough,
+// см. domain/behaviors.ts) — прототип шаблонирует ТОЛЬКО общие параметры (common), не
+// специфичные блоки source/sort/returnsInspect.
+export interface StationPrototype {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  common: StationParamsCommon;
 }
 
 // Заметка по batchIn (StationParamsCommon): для 'pack'/'shipTruck'/'shipCourier' это и есть
