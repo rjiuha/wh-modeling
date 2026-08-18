@@ -23,7 +23,7 @@ function HelpTip({ text }: { text: string }) {
   );
 }
 
-const BATCHING_TYPES = ['pack', 'mobileContainer', 'palletize', 'shipCourier', 'shipTruck', 'custom'];
+const BATCHING_TYPES = ['mobileContainer', 'palletize', 'shipCourier', 'shipTruck', 'custom'];
 
 function OptionalSelect<T extends string>({
   label,
@@ -58,7 +58,7 @@ function StationProps({ station, onStartEdgeDraft }: { station: Station; onStart
   const removeStation = useScenarioStore((s) => s.removeStation);
   const setSelected = useScenarioStore((s) => s.setSelected);
 
-  const isSource = station.type === 'sourceForward' || station.type === 'sourceReturn';
+  const isSource = station.type === 'sourceForward';
   const isStorage = station.type === 'storage';
 
   return (
@@ -188,25 +188,25 @@ function StationProps({ station, onStartEdgeDraft }: { station: Station; onStart
             <>
               <div className="field-group inline">
                 <label className="field-label">
-                  Доля кросс-дока
-                  <HelpTip text="Уже готовый, сконсолидированный груз (например, чужая паллета транзитом) — не вскрывается и не сортируется, едет прямиком из ворот в отгрузку грузовиком." />
+                  Доля возвратов
+                  <HelpTip text="Какая доля приезжающих машин везёт возвраты/брак от клиентов. Такие машины уходят на приём возвратов, а не на ворота разгрузки." />
                 </label>
                 <input
                   type="range"
                   min={0}
                   max={1}
                   step={0.05}
-                  value={station.source.crossdockShare}
+                  value={station.source.returnShare}
                   onChange={(e) =>
-                    updateStation(station.id, { source: { ...station.source!, crossdockShare: parseFloat(e.target.value) } })
+                    updateStation(station.id, { source: { ...station.source!, returnShare: parseFloat(e.target.value) } })
                   }
                 />
-                <span className="range-value">{Math.round(station.source.crossdockShare * 100)}%</span>
+                <span className="range-value">{Math.round(station.source.returnShare * 100)}%</span>
               </div>
               <div className="field-group inline">
                 <label className="field-label">
-                  Доля нонсорта
-                  <HelpTip text="Среди оставшегося (не кросс-док) груза — какая доля приходит россыпью (нонсорт), а какая сортовым грузом, который нужно вскрывать и пересортировывать." />
+                  Доля нонсорта (среди прямого груза)
+                  <HelpTip text="Среди прямого (не возвратного) груза — какая доля приходит россыпью (нонсорт), а какая сортовым грузом, который нужно вскрывать и пересортировывать." />
                 </label>
                 <input
                   type="range"
@@ -221,8 +221,8 @@ function StationProps({ station, onStartEdgeDraft }: { station: Station; onStart
                 <span className="range-value">{Math.round(station.source.nonsortShare * 100)}%</span>
               </div>
               <p className="hint-text">
-                Остаток ({Math.max(0, Math.round((1 - station.source.crossdockShare - station.source.nonsortShare) * 100))}%) —
-                сортовой груз, едет через сортировку.
+                Остаток прямого груза ({Math.max(0, Math.round((1 - station.source.nonsortShare) * 100))}%) —
+                сорт-груз, едет через сортировку, где и упаковывается.
               </p>
             </>
           )}

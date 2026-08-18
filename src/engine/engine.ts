@@ -188,7 +188,7 @@ export function runSimulation(scenario: Scenario): SimResult {
 
   // Инициализация источников
   for (const s of scenario.stations) {
-    if (s.type === 'sourceForward' || s.type === 'sourceReturn') {
+    if (s.type === 'sourceForward') {
       heap.push(sample(s.source!.interarrival, rng), { kind: 'arrival', stationId: s.id });
     }
   }
@@ -206,21 +206,26 @@ export function runSimulation(scenario: Scenario): SimResult {
     const ev = item.payload;
     if (ev.kind === 'arrival') {
       const station = stationsById.get(ev.stationId)!;
-      const isReturn = station.type === 'sourceReturn';
-      const units = Math.max(1, Math.round(sample(station.source!.unitsPerTruck, rng)));
+      const source = station.source!;
+      const units = Math.max(1, Math.round(sample(source.unitsPerTruck, rng)));
+      // Возвраты — доля входящего потока: часть машин уходит на приём возвратов (flow ret),
+      // остальной прямой груз делится на нонсорт/сорт по nonsortShare.
+      const isReturn = rng() < (source.returnShare ?? 0);
       let sortType: SimEntity['sortType'];
-      if (!isReturn) {
-        const r = rng();
-        const crossdockShare = station.source!.crossdockShare ?? 0;
-        const nonsortShare = station.source!.nonsortShare;
-        if (r < crossdockShare) sortType = 'crossdock';
-        else if (r < crossdockShare + nonsortShare) sortType = 'nonsort';
-        else sortType = 'sort';
+      let kind: SimEntity['kind'];
+      let flow: SimEntity['flow'];
+      if (isReturn) {
+        kind = 'returnTruck';
+        flow = 'ret';
+      } else {
+        kind = 'truck';
+        flow = 'fwd';
+        sortType = rng() < (source.nonsortShare ?? 0) ? 'nonsort' : 'sort';
       }
       const entity: SimEntity = {
         id: nextId(),
-        kind: isReturn ? 'returnTruck' : 'truck',
-        flow: isReturn ? 'ret' : 'fwd',
+        kind,
+        flow,
         sortType,
         unitsPerTruck: units,
         createdAt: now,

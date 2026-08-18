@@ -58,11 +58,6 @@ export function transformOnComplete(
       const damagedShare = station.returnsInspect?.damagedShare ?? 0.1;
       return consumed.map((e) => ({ ...e, condition: rng() < damagedShare ? 'damaged' : 'good' }));
     }
-    case 'pack': {
-      // Партия единиц объединяется в 1 упаковку/короб под конкретного получателя.
-      if (consumed.length === 0) return [];
-      return [childOf(nextId(), consumed[0], { kind: 'container' }, now)];
-    }
     case 'mobileContainer': {
       // Несколько упаковок объединяются в 1 мобильный контейнер — его целиком заберёт курьер.
       if (consumed.length === 0) return [];
@@ -79,7 +74,6 @@ export function transformOnComplete(
     case 'returnsGate':
     case 'utilization':
     case 'sourceForward':
-    case 'sourceReturn':
     default:
       return consumed;
   }

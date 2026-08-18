@@ -10,9 +10,10 @@
 // «Схема рекомендаций.json» оказалась движком РАЗМЕЩЕНИЯ (какая ячейка/аллея/контейнер), а не
 // маршрутизации по этапам процесса — ни один из типов рекомендаций не говорит «уезжает грузовиком
 // vs остаётся локально», так что построить из него рёбра (edges) между станциями напрямую нельзя.
-// Используем его только для трёх узких статистик, которые реально читаются из дерева: доля брака
-// (MoveToUtilizationCell), доля кросс-дока (ветки IsTransitWarehouse=True) и грубая оценка доли
-// нонсорта (по ArticleCategory). Подробности и обоснование — в плане сессии.
+// Используем его только для узких статистик, которые реально читаются из дерева: доля брака
+// (MoveToUtilizationCell) и грубая оценка доли нонсорта (по ArticleCategory). Ветка
+// IsTransitWarehouse больше не трактуется как кросс-док — кросс-док не равен транзиту, у входа
+// доли только «возвраты / сорт-груз / нонсорт». Подробности и обоснование — в плане сессии.
 import type { Scenario, Station, StationType } from './types';
 import { STATION_LABELS, StationTypes } from './types';
 import { buildEdgesFromTemplate } from './defaultScenario';
@@ -85,7 +86,9 @@ const TAG_STATION_MAP: [string, StationType][] = [
 
   ['MusPalletAssemblyZone', 'palletize'],
 
-  ['ContainerFillingCell', 'pack'],
+  // Отдельной «упаковки» нет (товар пакуется на сортировке) — ячейки наполнения контейнеров
+  // учитываются как формирование мобильных контейнеров.
+  ['ContainerFillingCell', 'mobileContainer'],
 
   ['MobileContainerOnCell', 'mobileContainer'],
   ['MobileContainerBufferInput', 'mobileContainer'],
@@ -101,11 +104,6 @@ const TAG_STATION_MAP: [string, StationType][] = [
   ['ZoneStorage', 'storage'],
   ['ClosedDstTareCell', 'storage'],
   ['ClosedTaresBufferCells', 'storage'],
-
-  ['WrongPlaceItemCell', 'custom'],
-  ['DefectiveItemCell', 'custom'],
-  ['OversizedItemCell', 'custom'],
-  ['ProblemSorted', 'custom'],
 ];
 
 const SUBTYPE_STATION_FALLBACK: Partial<Record<string, StationType>> = {
@@ -115,7 +113,7 @@ const SUBTYPE_STATION_FALLBACK: Partial<Record<string, StationType>> = {
   Row: 'storage',
   Alley: 'storage',
   MobileContainer: 'mobileContainer',
-  FillingRack: 'pack',
+  FillingRack: 'mobileContainer',
 };
 
 interface RawCell {
@@ -194,7 +192,6 @@ function walkRecommendations(nodes: unknown, context: Record<string, Set<string>
 
 export interface RecShares {
   damagedShare: number;
-  crossdockShare: number;
   nonsortShare: number;
   leafCount: number;
   notes: string[];
@@ -211,7 +208,6 @@ export function analyzeRecommendations(raw: unknown): RecShares {
   const total = leaves.length;
 
   const damagedLeaves = leaves.filter((l) => l.recType === 'MoveToUtilizationCell').length;
-  const crossdockLeaves = leaves.filter((l) => l.context['IsTransitWarehouse']?.has('True')).length;
 
   let nonsortCount = 0;
   let sortCount = 0;
@@ -223,18 +219,15 @@ export function analyzeRecommendations(raw: unknown): RecShares {
   }
 
   const damagedShare = total > 0 ? clampShare(damagedLeaves / total) : 0.15;
-  const crossdockShare = total > 0 ? clampShare(crossdockLeaves / total) : 0.15;
   const nonsortShare = nonsortCount + sortCount > 0 ? clampShare(nonsortCount / (nonsortCount + sortCount)) : 0.4;
 
   return {
     damagedShare,
-    crossdockShare,
     nonsortShare,
     leafCount: total,
     notes: [
       `Разобрано ${total} листьев дерева рекомендаций.`,
       `Доля брака (ветки MoveToUtilizationCell): ${Math.round(damagedShare * 100)}% (${damagedLeaves}/${total}).`,
-      `Доля кросс-дока (ветки IsTransitWarehouse=True): ${Math.round(crossdockShare * 100)}% (${crossdockLeaves}/${total}).`,
       nonsortCount + sortCount > 0
         ? `Доля нонсорта по ArticleCategory (грубая оценка): ${Math.round(nonsortShare * 100)}% (${nonsortCount}/${nonsortCount + sortCount} размеченных листьев).`
         : `Веток с ArticleCategory не нашли — доля нонсорта оставлена по умолчанию (${Math.round(nonsortShare * 100)}%).`,
@@ -248,12 +241,10 @@ const STATION_LAYOUT: Partial<Record<StationType, { x: number; y: number; w?: nu
   gate: { x: 250, y: 20 },
   sort: { x: 470, y: 20 },
   storage: { x: 690, y: 20 },
-  pack: { x: 910, y: 20 },
   mobileContainer: { x: 1090, y: 20, w: 190 },
   shipCourier: { x: 1300, y: 20 },
   palletize: { x: 690, y: 220 },
   shipTruck: { x: 940, y: 220 },
-  sourceReturn: { x: 30, y: 440 },
   returnsGate: { x: 250, y: 440 },
   returnsInspect: { x: 470, y: 440 },
   utilization: { x: 690, y: 540 },
@@ -284,11 +275,9 @@ export function buildScenarioFromWarehouseSchema(warehouseRaw: unknown, recShare
   const present = new Set<StationType>(Object.keys(counts) as StationType[]);
   const BACKBONE: StationType[] = [
     'sourceForward',
-    'sourceReturn',
     'gate',
     'sort',
     'storage',
-    'pack',
     'mobileContainer',
     'shipCourier',
     'palletize',
@@ -310,7 +299,8 @@ export function buildScenarioFromWarehouseSchema(warehouseRaw: unknown, recShare
     const params = defaultStationParams(type);
     if (count > 0) params.common = { ...params.common, resourceCount: deriveResourceCount(type, count) };
     if (type === 'sourceForward' && recShares && params.source) {
-      params.source = { ...params.source, crossdockShare: recShares.crossdockShare, nonsortShare: recShares.nonsortShare };
+      // Доля нонсорта прямого груза — из рекомендаций; returnShare/сорт-груз остаются по умолчанию.
+      params.source = { ...params.source, nonsortShare: recShares.nonsortShare };
     }
     if (type === 'returnsInspect' && recShares) {
       params.returnsInspect = { damagedShare: recShares.damagedShare };
