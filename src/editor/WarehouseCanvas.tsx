@@ -337,10 +337,15 @@ export function WarehouseCanvas({
               const isEdgeDraftSource = edgeDraftFrom === s.id || edgeDrag?.fromId === s.id;
               const isEdgeDropTarget = edgeDrag?.targetId === s.id;
               const counts = liveCounts?.[s.id];
-              const color = s.color ?? STATION_COLORS[s.type];
+              // STATION_LABELS/STATION_COLORS типизированы по StationType, но содержимое сценария —
+              // это персистентные/импортированные данные, которые могли пережить удаление типа из модели
+              // (например «pack»/«sourceReturn») или быть вручную отредактированы. Раньше неизвестный тип
+              // ронял весь канвас на STATION_LABELS[s.type].length — теперь фолбэк на сам тип, чтобы
+              // канвас отрисовался, а не упал белым экраном.
+              const color = s.color ?? STATION_COLORS[s.type] ?? '#9aa0a6';
               const textWidth = s.w - 22;
               const title = truncateForWidth(s.name, textWidth, 7.5);
-              const subtitle = truncateForWidth(STATION_LABELS[s.type], textWidth, 6);
+              const subtitle = truncateForWidth(STATION_LABELS[s.type] ?? s.type, textWidth, 6);
               return (
                 <g
                   key={s.id}
