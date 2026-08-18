@@ -71,7 +71,7 @@ export function StatsPanel() {
       <div className="stat-cards">
         <Card label="Грузовиков приехало (прямой поток)" value={totals.trucksArrivedFwd} />
         <Card label="Машин/партий возврата приехало" value={totals.trucksArrivedRet} />
-        <Card label="Отгружено грузовиками" value={totals.shippedTruck} sub="не локальная выдача + кросс-док" />
+        <Card label="Отгружено грузовиками" value={totals.shippedTruck} sub="не локальная выдача + транзит" />
         <Card label="Маршрутных листов сформировано" value={totals.shippedCourier} />
         <Card label="Возвратов восстановлено" value={totals.restocked} />
         <Card label="Списано/утилизировано" value={totals.writtenOff} />

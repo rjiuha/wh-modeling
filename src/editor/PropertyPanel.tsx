@@ -13,6 +13,7 @@ import {
 } from '../domain/types';
 import { useScenarioStore } from '../store/scenarioStore';
 import { DistributionEditor } from './DistributionEditor';
+import { EntityKindTimeEditor } from './EntityKindTimeEditor';
 import { fullEdgeWhenDescription } from './WarehouseCanvas';
 
 function HelpTip({ text }: { text: string }) {
@@ -114,6 +115,15 @@ function StationProps({ station, onStartEdgeDraft }: { station: Station; onStart
           unit="ч"
           value={station.common.serviceTime}
           onChange={(d) => updateStation(station.id, { common: { ...station.common, serviceTime: d } })}
+        />
+      )}
+
+      {!isSource && (
+        <EntityKindTimeEditor
+          label="Время обработки по видам"
+          unit="ч"
+          value={station.common.serviceTimeByKind}
+          onChange={(v) => updateStation(station.id, { common: { ...station.common, serviceTimeByKind: v } })}
         />
       )}
 
@@ -352,6 +362,12 @@ function EdgeProps({ edge, fromName, toName }: { edge: Edge; fromName: string; t
         unit="ч"
         value={edge.travelTime ?? { kind: 'const', value: 0.02 }}
         onChange={(d) => updateEdge(edge.id, { travelTime: d })}
+      />
+      <EntityKindTimeEditor
+        label="Время переноса по видам"
+        unit="ч"
+        value={edge.travelTimeByKind}
+        onChange={(v) => updateEdge(edge.id, { travelTimeByKind: v })}
       />
       <div className="panel-subtitle">
         Условие маршрутизации

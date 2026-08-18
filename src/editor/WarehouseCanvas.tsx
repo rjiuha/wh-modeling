@@ -16,7 +16,7 @@ import {
 } from '../domain/types';
 
 const SHORT_FLOW: Record<string, string> = { fwd: 'прямой', ret: 'возврат' };
-const SHORT_SORT: Record<string, string> = { sort: 'сорт', nonsort: 'нонсорт', crossdock: 'кросс-док' };
+const SHORT_SORT: Record<string, string> = { sort: 'сорт', nonsort: 'нонсорт', crossdock: 'транзит' };
 const SHORT_DEST: Record<string, string> = { local: 'локально', truck: 'грузовиком' };
 const SHORT_COND: Record<string, string> = { good: 'исправно', damaged: 'брак' };
 

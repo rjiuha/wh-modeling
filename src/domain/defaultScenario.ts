@@ -32,7 +32,7 @@ export const DEFAULT_EDGE_TEMPLATE: EdgeTemplateEntry[] = [
   // Прямой поток идёт с входа на ворота; возвратные машины (flow ret) — на приём возвратов.
   { fromType: 'sourceForward', toType: 'gate', when: { flow: 'fwd' } },
   { fromType: 'sourceForward', toType: 'returnsGate', when: { flow: 'ret' } },
-  // С ворот груз уходит на сортировку (сорт/нонсорт). Готовый кросс-док/транзит больше не
+  // С ворот груз уходит на сортировку (сорт/нонсорт). Готовый транзит больше не
   // создаётся на входе, но тип и это ребро сохранены (осталось «спящим»).
   { fromType: 'gate', toType: 'sort', when: { sortType: 'sort' } },
   { fromType: 'gate', toType: 'sort', when: { sortType: 'nonsort' } },

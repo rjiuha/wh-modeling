@@ -207,6 +207,7 @@
   margin-bottom: 10px;
 }
 .palette-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -227,6 +228,55 @@
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+.palette-hide {
+  position: absolute;
+  top: 2px;
+  right: 5px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px;
+  border-radius: 3px;
+}
+.palette-hide:hover {
+  color: var(--danger, #ef4444);
+  background: rgba(0, 0, 0, 0.06);
+}
+.palette-cat-title {
+  margin: 8px 0 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.palette-hidden {
+  margin-top: 8px;
+  border-top: 1px dashed var(--panel-border);
+  padding-top: 8px;
+}
+.palette-hidden-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 2px 0;
+}
+.palette-restore {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 4px;
+}
+.palette-hidden-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  opacity: 0.5;
 }
 
 /* ---- property panel / forms ---- */
@@ -311,6 +361,37 @@
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.5;
+}
+/* Время по видам предметов (EntityKindTimeEditor) */
+.check-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.check-inline input[type='checkbox'] {
+  width: auto;
+  margin: 0;
+}
+.ekind-list {
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: var(--canvas-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ekind-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ekind-check {
+  min-width: 150px;
 }
 
 /* ---- sim page ---- */

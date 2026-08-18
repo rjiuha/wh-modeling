@@ -46,7 +46,7 @@ export type Condition = 'good' | 'damaged';
 export const SORT_TYPE_LABELS: Record<SortType, string> = {
   sort: 'сортовой (нужно вскрыть и пересортировать)',
   nonsort: 'нонсорт (россыпь)',
-  crossdock: 'кросс-док / транзит (уже готовый груз, без обработки)',
+  crossdock: 'транзит (уже готовый груз, без обработки)',
 };
 export const DESTINATION_LABELS: Record<Destination, string> = {
   local: 'локальная выдача (этот склад)',
@@ -79,7 +79,9 @@ export interface Edge {
   to: string; // station id, либо специальный узел 'exit' не используется — exit кодируется отсутствием outputs
   when?: EdgeWhen;
   weight: number; // относительный вес среди подходящих рёбер (для ветвления в процентах)
-  travelTime?: Distribution; // визуальное+модельное время в пути между станциями
+  travelTime?: Distribution; // визуальное+модельное время в пути между станциями (общее; фолбэк)
+  // Время переноса ОТДЕЛЬНО для каждого вида предмета (не заданные — фолбэк на travelTime).
+  travelTimeByKind?: Partial<Record<EntityKind, Distribution>>;
 }
 
 // Доли назначения при сортировке/поступлении — используются behavior-хуками конкретных типов станций.
@@ -90,9 +92,12 @@ export interface DestinationMix {
 
 export interface StationParamsCommon {
   resourceCount: number; // число параллельных «серверов» (докеры/сортировщики/место в буфере и т.п.)
-  serviceTime: Distribution; // время обслуживания одного цикла
+  serviceTime: Distribution; // время обслуживания одного цикла (общее; фолбэк если вид не задан в serviceTimeByKind)
   batchIn: number; // сколько сущностей нужно накопить в очереди, чтобы начать цикл обслуживания
   queueCapacity?: number; // undefined = не ограничено; при переполнении сущность считается потерянной
+  // Время цикла ОТДЕЛЬНО для каждого вида предмета (только те виды, что заданы; не заданные —
+  // фолбэк на serviceTime). Цикл берёт партию сущностей, время выбирается по виду ПЕРВОЙ в партии.
+  serviceTimeByKind?: Partial<Record<EntityKind, Distribution>>;
 }
 
 export interface SourceParams {
@@ -131,17 +136,54 @@ export interface Station {
   description?: string;
 }
 
-// Пользовательский шаблон «своей» станции — имя/описание/цвет/параметры по умолчанию,
-// сохраняется в отдельной постоянной библиотеке (store/prototypeStore.ts), не привязан к
-// конкретному сценарию. Всегда создаёт станцию с type:'custom' (простой passthrough,
-// см. domain/behaviors.ts) — прототип шаблонирует ТОЛЬКО общие параметры (common), не
-// специфичные блоки source/sort/returnsInspect.
+// Категория прототипа — определяет, какие параметры редактируются и какой встроенный тип станции
+// может стоять за прототипом. Входные — источники груза (доли входа), промежуточные — обработка
+// (люди + время обслуживания, в т.ч. по видам предметов), конечные — отправка/списание (люди).
+export type PrototypeCategory = 'input' | 'intermediate' | 'terminal';
+export const PROTOTYPE_CATEGORY_LABELS: Record<PrototypeCategory, string> = {
+  input: 'Входная (источник груза)',
+  intermediate: 'Промежуточная (обработка)',
+  terminal: 'Конечная (отправка/списание)',
+};
+export const PROTOTYPE_CATEGORIES: PrototypeCategory[] = ['input', 'intermediate', 'terminal'];
+
+// К какой категории прототипа относится каждый встроенный тип станции. Используется, чтобы в
+// диалоге прототипа выбрать конкретный тип внутри категории, а при создании станции из прототипа
+// родить станцию РЕАЛЬНОГО типа (движок учитывает доли/время через behaviors/engine), а не 'custom'.
+export const STATION_CATEGORY: Record<StationType, PrototypeCategory> = {
+  sourceForward: 'input',
+  gate: 'intermediate',
+  sort: 'intermediate',
+  storage: 'intermediate',
+  mobileContainer: 'intermediate',
+  palletize: 'intermediate',
+  shipTruck: 'terminal',
+  shipCourier: 'terminal',
+  returnsGate: 'intermediate',
+  returnsInspect: 'intermediate',
+  utilization: 'terminal',
+  custom: 'intermediate',
+};
+export function stationTypesOfCategory(cat: PrototypeCategory): StationType[] {
+  return StationTypes.filter((t) => STATION_CATEGORY[t] === cat);
+}
+
+// Пользовательский шаблон станции — имя/описание/цвет + параметры, сохраняется в отдельной
+// постоянной библиотеке (store/prototypeStore.ts), не привязан к конкретному сценарию. В отличие
+// от старой модели (всегда создавала 'custom'), прототип теперь несёт КАТЕГОРИЮ и конкретный
+// встроенный тип (type), поэтому создание станции из прототипа рождает станцию РЕАЛЬНОГО типа с
+// его специфичными блоками (source/sort/returnsInspect) — движок учитывает доли/время.
 export interface StationPrototype {
   id: string;
   name: string;
   description: string;
   color: string;
+  category: PrototypeCategory;
+  type: StationType; // конкретный встроенный тип станции за прототипом
   common: StationParamsCommon;
+  source?: SourceParams; // если type === 'sourceForward'
+  sort?: SortParams; // если type === 'sort'
+  returnsInspect?: ReturnsInspectParams; // если type === 'returnsInspect'
 }
 
 // Заметка по batchIn (StationParamsCommon): для 'shipTruck'/'shipCourier'/'mobileContainer'/
@@ -201,7 +243,7 @@ export const STATION_HINTS: Record<StationType, string> = {
   storage: 'Буфер временного хранения — «вместимость» это места на стеллажах/в ячейках, а не люди.',
   mobileContainer: 'Несколько грузовых единиц объединяются в один мобильный контейнер — его целиком заберёт курьер.',
   palletize: 'Несколько грузовых единиц формируются в одну паллету под погрузку в грузовик.',
-  shipTruck: 'Погрузка паллет в исходящий грузовик и отправка. (Готовый кросс-док/транзит больше не создаётся на входе.)',
+  shipTruck: 'Погрузка паллет в исходящий грузовик и отправка. (Готовый транзит больше не создаётся на входе.)',
   shipCourier: 'Мобильный контейнер закрывается и привязывается к маршрутному листу курьера.',
   returnsGate: 'Приёмка машины/партии с возвратами — вход обратного потока, куда уходят возвратные машины от прямого источника.',
   returnsInspect: 'Проверка возврата: исправные единицы едут обратно на склад, брак — в утилизацию.',

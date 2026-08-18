@@ -41,6 +41,11 @@ export function defaultStationParams(type: StationType): Pick<Station, 'common' 
 interface ScenarioState {
   scenario: Scenario;
   selectedId: string | null; // station or edge id
+  // Типы станций, скрытые из палитры «Добавить станцию» в текущем сценарии. Скрывать тип нельзя,
+  // если на плане уже есть станция этого типа (см. hideStationType).
+  hiddenStationTypes: StationType[];
+  hideStationType: (type: StationType) => boolean; // false = нельзя (тип применён на плане)
+  unhideStationType: (type: StationType) => void;
   setSelected: (id: string | null) => void;
   replaceScenario: (s: Scenario) => void;
   resetToDefault: () => void;
@@ -49,7 +54,7 @@ interface ScenarioState {
     type: StationType,
     x: number,
     y: number,
-    overrides?: Partial<Pick<Station, 'name' | 'color' | 'description' | 'common'>>,
+    overrides?: Partial<Pick<Station, 'name' | 'color' | 'description' | 'common' | 'source' | 'sort' | 'returnsInspect'>>,
   ) => string;
   updateStation: (id: string, patch: Partial<Station>) => void;
   moveStation: (id: string, x: number, y: number) => void;
@@ -64,6 +69,16 @@ export const useScenarioStore = create<ScenarioState>()(
     (set, get) => ({
       scenario: buildDefaultScenario(),
       selectedId: null,
+      hiddenStationTypes: [],
+      hideStationType: (type) => {
+        if (get().scenario.stations.some((s) => s.type === type)) return false;
+        set((st) => ({
+          hiddenStationTypes: st.hiddenStationTypes.includes(type) ? st.hiddenStationTypes : [...st.hiddenStationTypes, type],
+        }));
+        return true;
+      },
+      unhideStationType: (type) =>
+        set((st) => ({ hiddenStationTypes: st.hiddenStationTypes.filter((t) => t !== type) })),
       setSelected: (id) => set({ selectedId: id }),
       replaceScenario: (s) => set({ scenario: s, selectedId: null }),
       resetToDefault: () => set({ scenario: buildDefaultScenario(), selectedId: null }),
@@ -80,6 +95,11 @@ export const useScenarioStore = create<ScenarioState>()(
           h: 84,
           ...defaultStationParams(type),
           ...(overrides?.common ? { common: overrides.common } : {}),
+          // Специфичные блоки из прототипа (входные доли/сортировка/инспекция) — заменяют дефолты
+          // типа; это и есть «прототип создаёт станцию реального типа с его настройками».
+          ...(overrides?.source ? { source: overrides.source } : {}),
+          ...(overrides?.sort ? { sort: overrides.sort } : {}),
+          ...(overrides?.returnsInspect ? { returnsInspect: overrides.returnsInspect } : {}),
           ...(overrides?.color ? { color: overrides.color } : {}),
           ...(overrides?.description ? { description: overrides.description } : {}),
         };

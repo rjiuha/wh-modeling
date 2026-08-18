@@ -160,7 +160,10 @@ export function runSimulation(scenario: Scenario): SimResult {
       });
       return;
     }
-    const travel = edge.travelTime ?? DEFAULT_TRAVEL;
+    // Время переноса можно задать отдельно для каждого вида предмета (travelTimeByKind) — тогда
+    // для сущности этого вида берём его, иначе общее travelTime (фолбэк на константу).
+    const byKindTravel = edge.travelTimeByKind?.[entity.kind];
+    const travel = byKindTravel ?? edge.travelTime ?? DEFAULT_TRAVEL;
     const t2 = now + sample(travel, rng);
     travelSegments.push({ entityId: entity.id, entityKind: entity.kind, flow: entity.flow, from: fromStationId, to: edge.to, t1: now, t2 });
     heap.push(t2, { kind: 'travelArrive', stationId: edge.to, entity });
@@ -180,7 +183,10 @@ export function runSimulation(scenario: Scenario): SimResult {
         st.waitSamples.push(now - c.enterQueue);
       }
       recordSeries(stationId);
-      const dur = sample(station.common.serviceTime, rng);
+      // Если для вида ПЕРВОЙ сущности в партии задано отдельное время (serviceTimeByKind) — берём
+      // его, иначе общее serviceTime. Партия обрабатывается циклом целиком, вид берём по первому.
+      const byKindService = station.common.serviceTimeByKind?.[consumed[0].entity.kind];
+      const dur = sample(byKindService ?? station.common.serviceTime, rng);
       st.serviceSamples.push(dur);
       heap.push(now + dur, { kind: 'serviceComplete', stationId, batch: consumed.map((c) => c.entity) });
     }

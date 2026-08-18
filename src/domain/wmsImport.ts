@@ -104,6 +104,13 @@ const TAG_STATION_MAP: [string, StationType][] = [
   ['ZoneStorage', 'storage'],
   ['ClosedDstTareCell', 'storage'],
   ['ClosedTaresBufferCells', 'storage'],
+
+  // Проблемные/спец-ячейки, которые раньше молча «терялись» при импорте (попадали в неклассифицированные):
+  // бракованный товар → утилизация, переложенный на чужое место → пересортировка, негабарит → особое
+  // хранение. Это разумные эвристики «на что похоже», не утверждение о реальном процессе.
+  ['DefectiveItemCell', 'utilization'],
+  ['WrongPlaceItemCell', 'sort'],
+  ['OversizedItemCell', 'storage'],
 ];
 
 const SUBTYPE_STATION_FALLBACK: Partial<Record<string, StationType>> = {
@@ -137,6 +144,9 @@ export interface WarehouseAggregation {
   counts: Partial<Record<StationType, number>>;
   totalCells: number;
   matchedCells: number;
+  // Теги/подтипы ячеек, которым не нашлась станция, — чтобы импорт не «терял» их молча и их
+  // можно было увидеть в summary и, при желании, дополнить TAG_STATION_MAP (см. Заметки).
+  unclassifiedByTag: Record<string, number>;
 }
 
 export function aggregateWarehouseCells(raw: unknown): WarehouseAggregation {
@@ -146,23 +156,49 @@ export function aggregateWarehouseCells(raw: unknown): WarehouseAggregation {
   }
   const cellList = Object.values(data.cells);
   const counts: Partial<Record<StationType, number>> = {};
+  const unclassifiedByTag: Record<string, number> = {};
   let matchedCells = 0;
   for (const cell of cellList) {
     const type = classifyCell(cell);
     if (type) {
       counts[type] = (counts[type] ?? 0) + 1;
       matchedCells++;
+    } else {
+      const tags = cell.tagNames ?? [];
+      if (tags.length === 0 && cell.subType) {
+        const k = `subType:${cell.subType}`;
+        unclassifiedByTag[k] = (unclassifiedByTag[k] ?? 0) + 1;
+      } else {
+        for (const t of tags) unclassifiedByTag[t] = (unclassifiedByTag[t] ?? 0) + 1;
+      }
     }
   }
-  return { counts, totalCells: cellList.length, matchedCells };
+  return { counts, totalCells: cellList.length, matchedCells, unclassifiedByTag };
 }
 
-// ---- Схема рекомендаций: только три узкие статистики (см. шапку файла).
+// ---- Схема рекомендаций: только узкие статистики (см. шапку файла).
 const NONSORT_CATEGORIES = ['Polybox', 'PlasticBag', 'ShoppingCart'];
 const SORT_CATEGORIES = ['Pallet', 'RollCage', 'TarePallet'];
 const SHARE_MIN = 0.02;
 const SHARE_MAX = 0.6;
 const clampShare = (v: number) => clamp(v, SHARE_MIN, SHARE_MAX);
+
+// Тип рекомендации в реальных выгрузках бывает либо строкой ('MoveToUtilizationCell' в файле №2),
+// либо объектом {name, title} ({name:'Utilization', title:'Утилизация'} в файле №1). Нормализуем в
+// ключ, по которому ищем редкие ветки, иначе доля брака для объектного формата молча уходила в 0 →
+// подставлялся дефолт 2% (см. Заметки).
+function recTypeKey(type: unknown): string {
+  if (!type) return '';
+  if (typeof type === 'string') return type;
+  if (typeof type === 'object') {
+    const o = type as { name?: unknown; title?: unknown };
+    if (typeof o.name === 'string') return o.name;
+    if (typeof o.title === 'string') return o.title;
+  }
+  return String(type);
+}
+// Ветки «утилизация/брак» в двух форматах типов рекомендаций.
+const DAMAGED_REC_TYPES = new Set(['MoveToUtilizationCell', 'Utilization']);
 
 interface RecLeaf {
   recType: string;
@@ -207,7 +243,7 @@ export function analyzeRecommendations(raw: unknown): RecShares {
   walkRecommendations(data.graph, {}, leaves);
   const total = leaves.length;
 
-  const damagedLeaves = leaves.filter((l) => l.recType === 'MoveToUtilizationCell').length;
+  const damagedLeaves = leaves.filter((l) => DAMAGED_REC_TYPES.has(recTypeKey(l.recType))).length;
 
   let nonsortCount = 0;
   let sortCount = 0;
@@ -262,7 +298,7 @@ export interface WmsImportResult {
 }
 
 export function buildScenarioFromWarehouseSchema(warehouseRaw: unknown, recShares?: RecShares): WmsImportResult {
-  const { counts, totalCells, matchedCells } = aggregateWarehouseCells(warehouseRaw);
+  const { counts, totalCells, matchedCells, unclassifiedByTag } = aggregateWarehouseCells(warehouseRaw);
 
   // В файле склада нет данных о трафике машин (это статический снимок структуры, не поток) —
   // источники и обратный поток всегда присутствуют с параметрами по умолчанию. Весь «хребет»
@@ -319,8 +355,18 @@ export function buildScenarioFromWarehouseSchema(warehouseRaw: unknown, recShare
 
   const edges = buildEdgesFromTemplate(typeToId);
 
+  const unclassifiedCount = totalCells - matchedCells;
+  const topUnclassified = Object.entries(unclassifiedByTag)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([k, n]) => `${k}×${n}`)
+    .join(', ');
+
   const summary = [
     `Разобрано ${totalCells} ячеек склада, классифицировано по назначению — ${matchedCells}.`,
+    unclassifiedCount > 0
+      ? `Не классифицировано — ${unclassifiedCount}${topUnclassified ? ` (${topUnclassified}…)` : ''}.`
+      : 'Все ячейки классифицированы.',
     `Создано станций: ${stations.length} (связей: ${edges.length}).`,
     ...StationTypes.filter((t) => (counts[t] ?? 0) > 0).map((t) => {
       const st = stations.find((s) => s.id === t)!;
