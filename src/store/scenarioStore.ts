@@ -7,12 +7,12 @@ import { nanoid } from 'nanoid';
 import type { Edge, Scenario, Station, StationType } from '../domain/types';
 import { buildDefaultScenario } from '../domain/defaultScenario';
 
-const BATCHING_TYPES: StationType[] = ['pack', 'mobileContainer', 'palletize', 'shipTruck', 'shipCourier'];
+const BATCHING_TYPES: StationType[] = ['mobileContainer', 'palletize', 'shipTruck', 'shipCourier'];
 
 // Экспортируется — переиспользуется генератором сценария из выгрузки WMS (domain/wmsImport.ts),
 // чтобы не дублировать параметры «по умолчанию» для каждого типа станции ещё раз.
 export function defaultStationParams(type: StationType): Pick<Station, 'common' | 'source' | 'sort' | 'returnsInspect'> {
-  const isSource = type === 'sourceForward' || type === 'sourceReturn';
+  const isSource = type === 'sourceForward';
   return {
     common: {
       resourceCount: isSource ? 1 : 2,
@@ -23,8 +23,8 @@ export function defaultStationParams(type: StationType): Pick<Station, 'common' 
       ? {
           interarrival: { kind: 'exponential', mean: 0.5 },
           unitsPerTruck: { kind: 'uniform', min: 10, max: 40 },
+          returnShare: 0.1,
           nonsortShare: 0.4,
-          crossdockShare: type === 'sourceForward' ? 0.15 : 0,
         }
       : undefined,
     sort:

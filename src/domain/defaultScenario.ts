@@ -1,11 +1,11 @@
 // src/domain/defaultScenario.ts
 // Сценарий-пример «из коробки»:
-//  - прямой поток: грузовики -> ворота -> сортировка -> [нонсорт/сорт]
-//      локальные -> хранение -> упаковка -> мобильные контейнеры -> отгрузка курьером
+//  - вход: грузовики -> ворота -> сортировка -> [нонсорт/сорт]
+//      локальные -> хранение -> мобильные контейнеры -> отгрузка курьером
 //      уезжающие грузовиком (не локально) -> паллетирование -> отгрузка грузовиком
-//  - кросс-док: уже готовый (сконсолидированный) груз едет с ворот сразу на отгрузку грузовиком,
-//    минуя сортировку и паллетирование — это буквально «из зоны приёмки в зону отгрузки»
-//  - обратный поток: возврат/брак -> приём -> инспекция -> ресток (хранение) либо утилизация
+//  - возвраты: доля входящего потока машин уходит на приём возвратов -> инспекция ->
+//    ресток (хранение) либо утилизация. Отдельного источника возвратов нет.
+//  - товар упаковывается на сортировке — отдельной станции «упаковка» нет.
 // Время везде в часах модельного времени.
 import type { Distribution, Edge, EdgeWhen, Scenario, Station, StationType } from './types';
 
@@ -29,19 +29,20 @@ export interface EdgeTemplateEntry {
 }
 
 export const DEFAULT_EDGE_TEMPLATE: EdgeTemplateEntry[] = [
-  { fromType: 'sourceForward', toType: 'gate' },
-  // с ворот груз либо уходит на сортировку (сорт/нонсорт), либо — если это уже готовый
-  // консолидированный груз (кросс-док) — едет напрямую в зону отгрузки транзитом.
+  // Прямой поток идёт с входа на ворота; возвратные машины (flow ret) — на приём возвратов.
+  { fromType: 'sourceForward', toType: 'gate', when: { flow: 'fwd' } },
+  { fromType: 'sourceForward', toType: 'returnsGate', when: { flow: 'ret' } },
+  // С ворот груз уходит на сортировку (сорт/нонсорт). Готовый кросс-док/транзит больше не
+  // создаётся на входе, но тип и это ребро сохранены (осталось «спящим»).
   { fromType: 'gate', toType: 'sort', when: { sortType: 'sort' } },
   { fromType: 'gate', toType: 'sort', when: { sortType: 'nonsort' } },
   { fromType: 'gate', toType: 'shipTruck', when: { sortType: 'crossdock' }, travelTime: u(0.05, 0.15) },
   { fromType: 'sort', toType: 'storage', when: { destination: 'local' } },
   { fromType: 'sort', toType: 'palletize', when: { destination: 'truck' } },
-  { fromType: 'storage', toType: 'pack', when: { flow: 'fwd' } },
-  { fromType: 'pack', toType: 'mobileContainer' },
+  // Локальный товар уже упакован на сортировке — уходит из хранения сразу в мобильные контейнеры.
+  { fromType: 'storage', toType: 'mobileContainer', when: { flow: 'fwd' } },
   { fromType: 'mobileContainer', toType: 'shipCourier' },
   { fromType: 'palletize', toType: 'shipTruck' },
-  { fromType: 'sourceReturn', toType: 'returnsGate' },
   { fromType: 'returnsGate', toType: 'returnsInspect' },
   { fromType: 'returnsInspect', toType: 'storage', when: { condition: 'good' } },
   { fromType: 'returnsInspect', toType: 'utilization', when: { condition: 'damaged' } },
@@ -70,7 +71,7 @@ export function buildDefaultScenario(): Scenario {
       x: 30,
       y: 20,
       common: { resourceCount: 1, serviceTime: c(0), batchIn: 1 },
-      source: { interarrival: exp(0.4), unitsPerTruck: u(20, 60), nonsortShare: 0.35, crossdockShare: 0.15 },
+      source: { interarrival: exp(0.4), unitsPerTruck: u(20, 60), returnShare: 0.1, nonsortShare: 0.35 },
     }),
     station({
       id: 'gate',
@@ -99,14 +100,6 @@ export function buildDefaultScenario(): Scenario {
       x: 690,
       y: 20,
       common: { resourceCount: 400, serviceTime: u(0.5, 6), batchIn: 1 },
-    }),
-    station({
-      id: 'pack',
-      type: 'pack',
-      name: 'Упаковка',
-      x: 910,
-      y: 20,
-      common: { resourceCount: 4, serviceTime: tri(0.03, 0.06, 0.12), batchIn: 8 },
     }),
     station({
       id: 'mobile_container',
@@ -142,15 +135,6 @@ export function buildDefaultScenario(): Scenario {
       common: { resourceCount: 2, serviceTime: tri(0.2, 0.4, 0.8), batchIn: 12 },
     }),
     station({
-      id: 'src_ret',
-      type: 'sourceReturn',
-      name: 'Приезд возвратов/брака',
-      x: 30,
-      y: 440,
-      common: { resourceCount: 1, serviceTime: c(0), batchIn: 1 },
-      source: { interarrival: exp(1.2), unitsPerTruck: u(5, 20), nonsortShare: 0, crossdockShare: 0 },
-    }),
-    station({
       id: 'ret_gate',
       type: 'returnsGate',
       name: 'Приём возвратов',
@@ -182,12 +166,10 @@ export function buildDefaultScenario(): Scenario {
     gate: 'gate',
     sort: 'sort',
     storage: 'storage',
-    pack: 'pack',
     mobileContainer: 'mobile_container',
     shipCourier: 'ship_courier',
     palletize: 'palletize',
     shipTruck: 'ship_truck',
-    sourceReturn: 'src_ret',
     returnsGate: 'ret_gate',
     returnsInspect: 'ret_inspect',
     utilization: 'utilization',
